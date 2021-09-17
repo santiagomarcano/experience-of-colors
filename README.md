@@ -7,3 +7,5 @@ There is a lot of space for improvements here since I just did this laying on th
 VanillaJS ended up being messy.. Sorry..
 
 I'll try to fix it on the future to come.
+
+[Demo](https://eofcolors.netlify.app)
