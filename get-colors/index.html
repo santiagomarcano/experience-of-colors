@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+        * {
+            font-family: "Courier New", Courier, monospace;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        #photo-canvas {
+            display: none;
+        }
+
+        img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            object-fit: cover;
+            filter: blur(5px);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        #container {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            height: 100vh;
+            width: 100vw;
+            z-index: 2;
+            bottom: 10rem;
+            overflow: hidden;
+        }
+
+        #container div {
+            height: 100vh;
+            width: 100%;
+            flex: 1;
+        }
+
+        #upload {
+            position: absolute;
+            bottom: 5rem;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+            flex-direction: column;
+        }
+
+        #upload div,
+        #upload a {
+            font-size: 24px;
+            font-weight: bold;
+            border: 1px salmon;
+            background-color: salmon;
+            padding: 10px;
+            border-radius: 5px;
+            width: 50%;
+            text-align: center;
+            margin-top: 10px;
+            color: black;
+        }
+
+        a:visited {
+            color: black;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        #download {
+            display: none;
+        }
+
+        [data-is-loaded="1'"]>upload #download {
+            display: block;
+        }
+
+        @keyframes blink {
+            from {
+                opacity: 0.5;
+            }
+
+            to {
+                opacity: 0.2;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <input type="file" accept="image/*" capture="camera" />
+    </div>
+    <div id="upload">
+        <div id="take">Take photo</div>
+        <a id="download" download="canvas.png">Download</a>
+    </div>
+    <canvas id="photo-canvas"></canvas>
+    <canvas id="container" data-is-loaded="0"></canvas>
+    <script>
+        const input = document.querySelector('input[type="file"]');
+        const uploadButton = document.querySelector("#upload #take");
+        uploadButton.addEventListener("click", () => {
+            input.click();
+        });
+    </script>
+    <script>
+        const canvas = document.querySelector("#photo-canvas");
+        const ctx = canvas.getContext("2d");
+        const download = document.querySelector("#upload #download");
+        let dt = null;
+        const scale = 1;
+        function median(numbers) {
+            const sorted = numbers.slice().sort((a, b) => a - b);
+            const middle = Math.floor(sorted.length / 2);
+            if (sorted.length % 2 === 0) {
+                return (sorted[middle - 1] + sorted[middle]) / 2;
+            }
+            return sorted[middle];
+        }
+        function drawColors(colors) {
+            const canvasColors = document.querySelector("canvas#container");
+            const colorsCtx = canvasColors.getContext("2d");
+            canvasColors.width = window.innerWidth;
+            canvasColors.height = window.innerHeight;
+            let x = 0;
+            let y = 0;
+            const rectWidth = window.innerWidth / colors.length;
+            const rectHeight = window.innerHeight / colors.length;
+            console.log(rectWidth);
+            for (let color of colors) {
+                colorsCtx.fillStyle = `rgba(${color})`;
+                colorsCtx.fillRect(0, y, window.innerWidth, rectHeight);
+                x = x + rectWidth;
+                y = y + rectHeight;
+            }
+            document.body.style.animation = "";
+            canvasColors.setAttribute("data-is-loaded", 1);
+            download.style.display = "block";
+            function dlCanvas() {
+                var dt = canvasColors.toDataURL('image/png');
+                this.href = dt;
+            };
+            download.addEventListener('click', dlCanvas, false);
+        }
+        function rgbToHsl(c) {
+            var r = c[0] / 255,
+                g = c[1] / 255,
+                b = c[2] / 255;
+            var max = Math.max(r, g, b),
+                min = Math.min(r, g, b);
+            var h,
+                s,
+                l = (max + min) / 2;
+
+            if (max == min) {
+                h = s = 0; // achromatic
+            } else {
+                var d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r:
+                        h = (g - b) / d + (g < b ? 6 : 0);
+                        break;
+                    case g:
+                        h = (b - r) / d + 2;
+                        break;
+                    case b:
+                        h = (r - g) / d + 4;
+                        break;
+                }
+                h /= 6;
+            }
+            return new Array(h * 360, s * 100, l * 100);
+        }
+        document
+            .querySelector("[type='file']")
+            .addEventListener("change", (e) => {
+                document.body.style.animation = "blink 0.5s alternate infinite";
+                const [file] = e.target.files;
+                const img = new Image();
+                img.onload = function () {
+                    canvas.width = this.naturalWidth;
+                    canvas.height = this.naturalHeight;
+                    ctx.drawImage(this, 0, 0);
+                    const { data: pixels } = ctx.getImageData(
+                        0,
+                        0,
+                        this.naturalWidth,
+                        this.naturalHeight
+                    );
+                    const map = {};
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        const rgba = pixels.slice(i, i + 4);
+                        const isAlmostBlack =
+                            rgba[0] < 80 && rgba[1] < 80 && rgba[2] < 80;
+                        const isAlmostWhite =
+                            rgba[0] > 200 && rgba[1] > 200 && rgba[2] > 200;
+                        if (rgba[3] > 255 / 2 && !isAlmostBlack && !isAlmostWhite) {
+                            const key = rgba.join(",");
+                            map[key] = (map[key] || 0) + 1;
+                        }
+                    }
+                    const values = Object.entries(map).map((item) => item[1]);
+                    const max = values.reduce((a, b) => Math.max(a, b), 0);
+                    const m = median(values);
+                    const min = values.reduce((a, b) => Math.min(a, b));
+                    const colors = Object.entries(map);
+                    const colorsRgba = colors
+                        .map(([key, value]) => ({
+                            key,
+                            hls: rgbToHsl(key.split(",").map((i) => +i)),
+                        }))
+                        .sort((a, b) => {
+                            return a.hls[0] - b.hls[0];
+                        })
+                        .map((c) => c.key.split(","));
+                    drawColors(colorsRgba);
+                };
+                img.src = URL.createObjectURL(file);
+                // document.body.append(img);
+            });
+    </script>
+</body>
+
+</html>
